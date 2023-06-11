@@ -57,7 +57,7 @@ func sendMessage(ctx context.Context, c *app.RequestContext) {
 	})
 	if err != nil {
 		c.String(consts.StatusInternalServerError, err.Error())
-	} else if resp.Code != 0 {
+	} else if resp.Code != 200 {
 		c.String(consts.StatusInternalServerError, resp.Msg)
 	} else {
 		c.Status(consts.StatusOK)
@@ -81,9 +81,8 @@ func pullMessage(ctx context.Context, c *app.RequestContext) {
 	if err != nil {
 		c.String(consts.StatusInternalServerError, err.Error())
 		return
-	} else if resp.Code != 0 {
+	} else if resp.Code != 200 {
 		c.String(consts.StatusInternalServerError, resp.Msg)
-		return
 	}
 	messages := make([]*api.Message, 0, len(resp.Messages))
 	for _, msg := range resp.Messages {

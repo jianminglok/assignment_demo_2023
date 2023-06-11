@@ -32,12 +32,12 @@ services:
     restart: always
     environment:
       - MYSQL_DATABASE=im
-      - MYSQL_ROOT_PASSWORD=mauFJcuf5dhRMQrjj
+      - MYSQL_ROOT_PASSWORD=rootPasswordToBeUpdated
     ports:
       - '3306:3306'
     volumes:
+      - ./dbscripts/init.sql:/docker-entrypoint-initdb.d/init.sql
       - db:/var/lib/mysql
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
 volumes:
   db:
     driver: local

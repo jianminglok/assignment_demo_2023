@@ -55,6 +55,8 @@ func (s *IMServiceImpl) Pull(ctx context.Context, req *rpc.PullRequest) (*rpc.Pu
 	var cursor int64
 	var hasMore bool
 	var nextCursor int64
+	var limit int32
+
 	resp := rpc.NewPullResponse()
 
 	if req.Chat == "" {
@@ -69,9 +71,11 @@ func (s *IMServiceImpl) Pull(ctx context.Context, req *rpc.PullRequest) (*rpc.Pu
 	}
 
 	if &req.Limit != nil && req.Limit > 0 {
-		pullStatement += " LIMIT " + fmt.Sprint(req.Limit)
+		pullStatement += " LIMIT " + fmt.Sprint(req.Limit+1)
+		limit = req.Limit
 	} else {
-		pullStatement += " LIMIT 10"
+		pullStatement += " LIMIT 11"
+		limit = 10
 	}
 
 	results, err := db.Query(pullStatement, req.Chat, cursor)
@@ -81,72 +85,41 @@ func (s *IMServiceImpl) Pull(ctx context.Context, req *rpc.PullRequest) (*rpc.Pu
 		return resp, nil
 	}
 
+	var currentIdx int32 = 0
 	for results.Next() {
-		var message rpc.Message
-		var id int32
-		err = results.Scan(&id, &message.Chat, &message.Text, &message.Sender, &message.SendTime)
-		if err != nil {
-			log.Printf("Error retrieving messages from database: %s", err)
-			resp.Code, resp.Msg = consts.StatusInternalServerError, "Error retrieving messages"
-			return resp, nil
-		}
-		resp.Messages = append(resp.Messages, &message)
-	}
-
-	if len(resp.Messages) > 0 {
-		if &req.Reverse != nil && *req.Reverse == true {
-			for i, j := 0, len(resp.Messages)-1; i < j; i, j = i+1, j-1 {
-				resp.Messages[i], resp.Messages[j] = resp.Messages[j], resp.Messages[i]
-			}
-
-			var testStatement = "SELECT sendtime from `messages` WHERE `chat` = (?) AND `sendtime` < (?) ORDER BY `sendtime` DESC"
-			if &req.Limit != nil && req.Limit > 0 {
-				testStatement += " LIMIT " + fmt.Sprint(req.Limit)
-			} else {
-				pullStatement += " LIMIT 10"
-			}
-
-			resultsOther, err := db.Query(testStatement, req.Chat, resp.Messages[len(resp.Messages)-1].SendTime)
-			if err != nil && err != sql.ErrNoRows {
-				log.Printf("Error retrieving next cursor from database: %s", err)
+		if currentIdx < limit {
+			var message rpc.Message
+			var id int32
+			err = results.Scan(&id, &message.Chat, &message.Text, &message.Sender, &message.SendTime)
+			if err != nil {
+				log.Printf("Error retrieving messages from database: %s", err)
 				resp.Code, resp.Msg = consts.StatusInternalServerError, "Error retrieving messages"
 				return resp, nil
-			} else if err == sql.ErrNoRows {
-				hasMore = false
-			} else {
-				for resultsOther.Next() {
-					err := resultsOther.Scan(&nextCursor)
-					if err != nil {
-						if err == sql.ErrNoRows {
-							hasMore = false
-						}
-						log.Fatal(err)
-					} else {
-						hasMore = true
-						resp.NextCursor = &nextCursor
-					}
-				}
 			}
-		} else {
-			result := db.QueryRow("SELECT sendtime from `messages` WHERE `chat` = (?) AND `sendtime` > (?) ORDER BY `sendtime` ASC", req.Chat, resp.Messages[len(resp.Messages)-1].SendTime)
-			if result != nil {
-				err := result.Scan(&nextCursor)
-				if err != nil {
-					if err == sql.ErrNoRows {
-						hasMore = false
-					} else {
-						log.Printf("Error retrieving next cursor from database: %s", err)
-						resp.Code, resp.Msg = consts.StatusInternalServerError, "Error retrieving messages"
-						return resp, nil
-					}
-				} else {
-					hasMore = true
-					resp.NextCursor = &nextCursor
-				}
+			resp.Messages = append(resp.Messages, &message)
+		} else if currentIdx == limit {
+			var id int32
+			var chat string
+			var text string
+			var sender string
+			err = results.Scan(&id, &chat, &text, &sender, &nextCursor)
+			if err != nil {
+				log.Printf("Error retrieving messages from database: %s", err)
+				resp.Code, resp.Msg = consts.StatusInternalServerError, "Error retrieving messages"
+				return resp, nil
 			}
+			hasMore = true
+			resp.HasMore = &hasMore
+			resp.NextCursor = &nextCursor
+		}
+		currentIdx += 1
+	}
+
+	if len(resp.Messages) > 0 && &req.Reverse != nil && *req.Reverse == true {
+		for i, j := 0, len(resp.Messages)-1; i < j; i, j = i+1, j-1 {
+			resp.Messages[i], resp.Messages[j] = resp.Messages[j], resp.Messages[i]
 		}
 	}
-	resp.HasMore = &hasMore
 
 	resp.Code = consts.StatusOK
 	return resp, nil

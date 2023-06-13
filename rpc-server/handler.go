@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/TikTokTechImmersion/assignment_demo_2023/rpc-server/kitex_gen/rpc"
@@ -30,12 +31,34 @@ func init() {
 func (s *IMServiceImpl) Send(ctx context.Context, req *rpc.SendRequest) (*rpc.SendResponse, error) {
 	resp := rpc.NewSendResponse()
 	if req.Message == nil {
-		resp.Code, resp.Msg = consts.StatusBadRequest, "Chat, text and sender should not be empty"
+		resp.Code, resp.Msg = consts.StatusBadRequest, "Chat, text and sender fields should not be empty"
 		return resp, nil
 	}
 
 	if req.Message.Chat == "" || req.Message.Text == "" || req.Message.Sender == "" {
-		resp.Code, resp.Msg = consts.StatusBadRequest, "Chat, text and sender should not be empty"
+		resp.Code, resp.Msg = consts.StatusBadRequest, "Chat, text and sender fields should not be empty"
+		return resp, nil
+	}
+
+	if strings.Count(req.Message.Chat, ":") != 1 {
+		resp.Code, resp.Msg = consts.StatusBadRequest, "Chat field should contain only 1 : separating the 2 names, and names cannot contain :"
+		return resp, nil
+	}
+
+	chatSplit := strings.Split(req.Message.Chat, ":")
+	var senderIsValid = false
+	for i := 0; i < len(chatSplit); i++ {
+		if chatSplit[i] == req.Message.Sender {
+			senderIsValid = true
+			break
+		} else if chatSplit[i] == "" {
+			resp.Code, resp.Msg = consts.StatusBadRequest, "Names of people in chat field must not be empty"
+			return resp, nil
+		}
+	}
+
+	if !senderIsValid {
+		resp.Code, resp.Msg = consts.StatusBadRequest, "Sender name should be one of the 2 names in the chat field"
 		return resp, nil
 	}
 
@@ -60,8 +83,21 @@ func (s *IMServiceImpl) Pull(ctx context.Context, req *rpc.PullRequest) (*rpc.Pu
 	resp := rpc.NewPullResponse()
 
 	if req.Chat == "" {
-		resp.Code, resp.Msg = consts.StatusBadRequest, "Chat should not be empty"
+		resp.Code, resp.Msg = consts.StatusBadRequest, "Chat field should not be empty"
 		return resp, nil
+	}
+
+	if strings.Count(req.Chat, ":") != 1 {
+		resp.Code, resp.Msg = consts.StatusBadRequest, "Chat field should contain only 1 : separating the 2 names, and names cannot contain :"
+		return resp, nil
+	}
+
+	chatSplit := strings.Split(req.Chat, ":")
+	for i := 0; i < len(chatSplit); i++ {
+		if chatSplit[i] == "" {
+			resp.Code, resp.Msg = consts.StatusBadRequest, "Names of people in chat field must not be empty"
+			return resp, nil
+		}
 	}
 
 	if &req.Cursor != nil && req.Cursor > 0 {

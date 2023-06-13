@@ -34,9 +34,9 @@ docker-compose up -d --build
     - Sending messages ```/api/send```
         | Parameter      | Description | Format | Type | Required |
         | ----------- | ----------- | ----------- | ----------- | ----------- | 
-        | chat      | Chat to send message to       | personA:personB | string | Yes |
+        | chat      | Chat to send message to       | personA:personB, name of person should not contain ```:``` | string | Yes |
         | text   | Message to send        | N/A | string | Yes |
-        | sender | Name of sender | personA | string | Yes |
+        | sender | Name of sender, should not contain ```:``` | personA | string | Yes |
 
         Example:
 
@@ -51,7 +51,7 @@ docker-compose up -d --build
     - Pulling messages 
         | Parameter      | Description | Format | Type | Default | Required |
         | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | 
-        | chat      | Chat to pull messages from      | personA:personB | string | N/A | Yes |
+        | chat      | Chat to pull messages from      | personA:personB, name of person should not contain ```:``` | string | N/A | Yes |
         | cursor   | Minimum sendtime of messages to pull        | N/A | int64 | 0 | Optional |
         | limit | Maximum number of messages to pull | N/A | int32 | 10 | Optional |
         | reverse | Messages will be sorted in descending accorder by sendtime if set to true | N/A | boolean | false | Optional |
